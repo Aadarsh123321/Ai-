@@ -1,0 +1,6 @@
+{
+  "name": "AI Tutor",
+  "description": "Elite Learning AI Voice Engine & Blackboard Tutor with ultra-natural human voice lectures, real-time synchronized chalk drawing, KaTeX math derivations, and dynamic problem solver.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

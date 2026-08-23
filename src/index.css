@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+html, body, #root {
+    height: 100vh;
+    margin: 0;
+    background-color: #0F172A;
+}
+
+.written-text {
+    position: absolute;
+    font-family: 'Kalam', cursive;
+    text-shadow: 0 0 8px rgba(255,255,255,0.3);
+    white-space: nowrap;
+}
+
+.latex-wipe {
+    position: absolute;
+    clip-path: inset(0 100% 0 0);
+}

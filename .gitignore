@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+assets/PK
+assets/.aistudio/PK
+assets/.aistudio/.gitignore*
