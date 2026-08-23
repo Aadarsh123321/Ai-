@@ -17,11 +17,9 @@ app.post('/api/analyze', async (req, res) => {
     if (!data || !prompt) {
       return res.status(400).json({ error: 'Missing data or prompt' });
     }
-    // Using fallback key if env var is missing
-    const fallbackKey = "AQ.Ab8RN6IjMEg" + "MqUuhG7-gJ8rVuHFMrYj8tQE64LtP1LEDAib9bQ";
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || fallbackKey;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
+      return res.status(500).json({ error: 'Please configure your Gemini API Key in the AI Studio Settings.' });
     }
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -31,8 +29,15 @@ app.post('/api/analyze', async (req, res) => {
       })
     });
     if (!response.ok) {
-      const err = await response.text();
-      return res.status(response.status).json({ error: err });
+      const errText = await response.text();
+      let errMsg = errText;
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.error && errJson.error.message) {
+          errMsg = errJson.error.message;
+        }
+      } catch (e) {}
+      return res.status(response.status).json({ error: errMsg });
     }
     // Proxy the stream back to the client
     res.setHeader('Content-Type', 'text/event-stream');

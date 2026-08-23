@@ -785,10 +785,7 @@ export default function App() {
                 
             } catch (error: any) {
                 console.error("Error with analysis", error);
-            }
-            
-            if (!success) {
-                setStatus("Error: Failed to connect to AI.");
+                setStatus(`Error: ${error.message || "Failed to connect to AI."}`);
             }
             
             setIsAnalyzing(false);
