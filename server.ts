@@ -21,7 +21,7 @@ app.post('/api/analyze', async (req, res) => {
     if (!GEMINI_API_KEY) {
       return res.status(500).json({ error: 'Please configure your Gemini API Key in the AI Studio Settings.' });
     }
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
