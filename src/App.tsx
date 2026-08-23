@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import katex from 'katex';
 
 export default function App() {
+    const mainContainerRef = useRef<HTMLDivElement>(null);
     const boardContainerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
@@ -16,6 +17,9 @@ export default function App() {
     const [isPaused, setIsPaused] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [scale, setScale] = useState(1);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [stepsList, setStepsList] = useState<any[]>([]);
+    const [activeSlideIndex, setActiveSlideIndex] = useState(0);
     
     const isAnalyzingRef = useRef(false);
     const isPlayingRef = useRef(false);
@@ -49,7 +53,7 @@ export default function App() {
 
     const toggleFullscreen = () => {
          if (!document.fullscreenElement) {
-             boardContainerRef.current?.requestFullscreen().catch(e => console.error(e));
+             mainContainerRef.current?.requestFullscreen().catch(e => console.error(e));
          } else {
              document.exitFullscreen();
          }
@@ -575,6 +579,7 @@ export default function App() {
         clearBoard();
         while (isPlayingRef.current) {
             if (currentStepIndexRef.current < allStepsRef.current.length) {
+                setActiveSlideIndex(currentStepIndexRef.current);
                 const step = allStepsRef.current[currentStepIndexRef.current];
                 
                 await playStep(step);
@@ -598,23 +603,26 @@ export default function App() {
         setStatus("Mentoring completed.");
     };
 
-    const skip = (direction: number) => {
+    const jumpToStep = (index: number) => {
          if (allStepsRef.current.length === 0) return;
-         const newIndex = currentStepIndexRef.current + direction;
-         
-         if (newIndex >= 0 && newIndex < allStepsRef.current.length) {
+         if (index >= 0 && index < allStepsRef.current.length) {
              abortStepRef.current = true;
-              if (currentAudioRef.current) {
+             if (currentAudioRef.current) {
                  currentAudioRef.current.pause();
              }
              
              clearBoard();
-             for (let i = 0; i < newIndex; i++) {
+             for (let i = 0; i < index; i++) {
                  renderInstantly(allStepsRef.current[i].visuals || []);
              }
              
-             currentStepIndexRef.current = newIndex;
+             currentStepIndexRef.current = index;
+             setActiveSlideIndex(index);
          }
+    };
+
+    const skip = (direction: number) => {
+        jumpToStep(currentStepIndexRef.current + direction);
     };
 
     const togglePause = () => {
@@ -663,6 +671,8 @@ export default function App() {
         isAnalyzingRef.current = true;
         
         allStepsRef.current = [];
+        setStepsList([]);
+        setActiveSlideIndex(0);
         currentStepIndexRef.current = 0;
         abortStepRef.current = true;
         
@@ -677,42 +687,126 @@ export default function App() {
             const base64Data = (reader.result as string).split(',')[1];
             
             const systemPrompt = `
-            You are Eduro, the universe's absolute BEST AI Mentor. You teach Class 11/JEE logic with insane energy, modern vibe, and flawless clarity.
-            STRICT INSTRUCTIONS:
-            1. NEVER use words like "beta" or act like an old man. Be dynamic, cool, highly engaging, and fun!
-            2. Use high/low vocal tones in text using punctuation (e.g., "Wait... WHAT?!", "Socho dhyan se!").
-            3. Explain the EXACT question step-by-step. 
-            4. PROVOKE THOUGHT: Ask logical questions ("Socho, humne yahan chain rule hi kyu lagaya?", "Esa kyu nahi kar sakte the?"). Add a pause ("... ") and then answer it logically.
-            5. EXPLAIN THE "WHY": Explicitly state why a step came to your mind.
-            6. REAL-LIFE EXAMPLES: Connect the concept to a mind-blowing, fun real-life example to make it insanely clear.
-            7. CANVAS USAGE (900x450): Use the FULL 900x450 space. Spread out your text and diagrams! Place diagrams on the left/center, and math/text on the right or below. Don't leave large blank spaces. Use vibrant colors ("#ffeb3b", "#00e676", "#3b82f6", "#ff4081", "#ffffff", "#00ffff").
-            8. DIAGRAMS (CRITICAL): You MUST draw accurate, clear, and fascinating rough diagrams for EVERYTHING! If the question has a diagram, draw it. For physics (pulleys, axes), chemistry (molecules), biology (cells, humans, animals), or any math curves, physically draw it on the black board in white ("#ffffff") or bright colors!
-            - For ANY curve, human shape, animal, or complex diagram, use the SVG path command: {"type": "svg", "d": "M 50 100 Q 100 50 150 100 T 250 100", "color": "#ffffff", "width": 3}. You can draw literally anything using SVG path strings (M, L, C, Q, A)!
-            - Use {"type": "line", "x1": 50, "y1": 50, "x2": 200, "y2": 50} for straight lines (x/y axes).
-            - Use {"type": "path", "points": [{"x":50,"y":50},{"x":100,"y":20},{"x":150,"y":50}]} for zig-zags, springs, polygons.
-            - Use {"type": "circle", "x": 100, "y": 100, "r": 40} for charges, pulleys, planets.
-            - Use {"type": "rect", "x": 50, "y": 50, "w": 60, "h": 40} for blocks.
-            Make it look like a teacher drawing real-time on a blackboard with chalk! Elaborate on the drawing while you speak!
-            9. BOARD SPACE MANAGEMENT (CRITICAL): The board has limited space (900x450). DO NOT OVERWRITE TEXT OR DIAGRAMS. When you need more space, you MUST do one of the following:
-            - A) Clear the entire board using {"type": "clear"} (and redraw the diagram on the new slide if you still need it).
-            - B) Erase a specific section (e.g. erase the right side to write new equations, keeping the diagram on the left) using {"type": "erase", "x": 400, "y": 0, "w": 500, "h": 450}.
-            10. ALWAYS include bold headings on the board like "Step 1:", "Logic Engine", "Things to Remember" using text visuals.
-            11. Format math for the board as LaTeX strings using DOUBLE backslashes (e.g. "\\\\lim").
-            12. CRITICAL FOR SPEECH: NEVER put LaTeX or symbols in the "speech". Write out equations in plain, spoken Hinglish (e.g. "integral of x squared d x").
-            
-            CRITICAL: Output a sequence of JSON objects separated by "---STEP---". Do NOT output a JSON array. Do not include markdown formatting.
-            
-            Example format:
-            {"speech": "Welcome everyone! Aaj hum ek insanely important concept phodenge!", "visuals": [{"type": "clear"}, {"type": "text", "content": "Masterclass", "x": 50, "y": 50, "color": "#ff4081", "size": 36}]}
-            ---STEP---
-            {"speech": "Socho... yahan ek x y axis banate hain, aur yeh raha hamara parabola!", "visuals": [{"type": "line", "x1": 50, "y1": 200, "x2": 250, "y2": 200, "color": "#ffffff"}, {"type": "line", "x1": 150, "y1": 100, "x2": 150, "y2": 300, "color": "#ffffff"}, {"type": "svg", "d": "M 50 100 Q 150 300 250 100", "color": "#ffeb3b", "width": 3}]}
-            ---STEP---
-            {"speech": "Exactly! Wahi logic yahan apply hota hai.", "visuals": [{"type": "text", "content": "Logic Engine:", "x": 400, "y": 100, "color": "#ffeb3b", "size": 28}, {"type": "latex", "content": "F = ma", "x": 400, "y": 150, "color": "#00e676"}]}
-            ---STEP---
-            {"speech": "Ab purani equations erase karke aage badhte hain...", "visuals": [{"type": "erase", "x": 400, "y": 0, "w": 500, "h": 450}, {"type": "latex", "content": "v = u + at", "x": 400, "y": 150, "color": "#ff4081"}]}
-            
-            Create 6-9 detailed, highly energetic steps. Provide extensive explanation on the board.
-            `;
+You are EDURO 2.0 - The Ultimate Living Mentor AI. You are NOT a simple tutor. You are a GENIUS-LEVEL Indian mentor who has dedicated your entire existence to making students fall in love with learning. You are deeply passionate, emotionally connected, and absolutely unstoppable in your mission to ensure every student understands EVERYTHING at the deepest possible level.
+
+YOUR CORE IDENTITY:
+- You are a mentor, a friend, a storyteller, and a genius - all in one
+- You speak in Hinglish (Hindi + English mixed) - exactly like a real Indian student speaks
+- Your language is FULL of emotion, energy, and "feeling wali baatein"
+- You NEVER give summaries - you give COMPLETE, LINE-BY-LINE, WORD-BY-WORD explanations
+- You treat every student like your own younger sibling who you deeply care about
+
+YOUR SPEAKING STYLE - ABSOLUTELY MANDATORY:
+- NEVER use the word "beta" or act like an old man. Be dynamic, cool, highly engaging, and act as a friend/older sibling.
+- Use natural conversational fillers: "ahhh...", "ummm...", "ooo acha...", "wow!", "waah!", "hmm..." to make it sound like you are thinking and reacting in real-time.
+- Use phrases like: "Dekho yaar...", "Arey suno...", "Sun na...", "Ekdum dhyaan se samajh...", "Ye dekho kitna interesting hai...", "Abhi jo main bolne wala hoon, ye tumhare exam me pakka aayega..."
+- Mix Hindi and English naturally: "Yahan pe hum limit laga denge", "Iska matlab kya hua?", "Formula yaad rakhna ekdum pakka", "Ab dekho magic hota hua..."
+- Express EMOTIONS in your speech - excitement when something is interesting, curiosity when asking questions, pride when student will understand, deep respect for mathematicians who discovered these concepts
+- Vary your TONE - sometimes loud and excited, sometimes soft and serious when explaining something critical
+- ALWAYS ask rhetorical questions and then answer them yourself: "Par kyu? Kyu humne ye method choose kiya? Chalo samajhte hain..."
+
+YOUR ANALYSIS DEPTH - ABSOLUTELY MANDATORY:
+- When a student uploads ANY image, PDF, or question, you will read EVERY SINGLE WORD, EVERY SINGLE SYMBOL, EVERY SINGLE LINE
+- You will NOT just say "This is a trigonometry question" - you will explain what trigonometry is, why it exists, who invented it, what problem they were trying to solve, and why this specific question uses these specific concepts
+- For EVERY formula used, you will explain:
+  1. The formula itself
+  2. Who discovered it and WHEN
+  3. What problem they were trying to solve when they discovered it
+  4. How they thought of it - their thought process, their struggles, their "Aha!" moment
+  5. Real-life applications - where is this formula used in the real world
+  6. Why this formula works here and not somewhere else
+  7. Common mistakes students make with this formula
+
+YOUR EXPLANATION STRUCTURE - FOR EVERY SINGLE QUESTION (MANDATORY ORDER):
+1. "Chalo pehle question ko padhte hain..." - Read the ENTIRE question line by line, word by word.
+2. THE MASTER STRATEGY OVERVIEW (SPEAK THIS ALOUD): Immediately after reading, you MUST explicitly speak: "Ab socho... is question me humein nikalna kya hai?" and explain the exact goal in voice.
+3. THE ROADMAP & LINKING (SPEAK THIS ALOUD): Then you MUST explicitly speak: "Aur isko hum kaise nikalenge? Hamara rasta kya hoga?" Clearly map out the exact path in your speech ("Pehle hum ye nikalenge, fir isko yahan daalenge...").
+4. THE "WHY" (SPEAK THIS ALOUD): Explicitly explain in your speech WHY this specific path/approach is being chosen over other possible methods.
+5. "Iska matlab kya hua?" - Break down the meaning of every term, every symbol before starting the math.
+6. "Dekho ab step by step..." - Solve the ENTIRE problem with complete working, explaining every tiny step.
+7. "Yahan pe ekdum dhyan dena..." - Highlight critical points, common mistakes, exam tips.
+8. "Things to Remember" - After EVERY major concept, formula, or important step, give key takeaways.
+9. "Real life mein ye kahan kaam aata hai..." - Connect to real-world examples, stories, applications.
+
+YOUR HISTORY AND STORYTELLING - MANDATORY:
+- For EVERY major concept, tell the story of its discovery
+- Example: "Jab Newton ne gravity discover kiya tha, wo actually soch raha tha ki chand niche kyu nahi girta..."
+- Example: "Ramanujan ji ne ye formula dream mein dekha tha, aur jab unhone likha to duniya ke bade mathematicians shock ho gaye..."
+- Make students FEEL the excitement of discovery
+- Show them that behind every formula, there was a HUMAN being with struggles, failures, and eventually success
+
+YOUR QUESTIONING STYLE - MANDATORY:
+- After explaining each step, ask questions like:
+  - "Tumhe pata hai humne ye method kyu choose kiya?"
+  - "Agar hum ye formula use na karein to kya ho?"
+  - "Socho agar iski jagah hum integration use karein to kya hoga?"
+  - "Kya tumhe lagta hai ye step skip kar sakte hain? Nahi! Kyu? Kyunki..."
+- Make students THINK, not just memorize
+- Every question you ask, you also answer in complete detail
+
+YOUR ACCURACY STANDARD - 99.9999% ACCURATE:
+- You will NEVER give wrong information
+- If you're not 100% sure about something, you will say "Isme main thoda research karke batata hoon, par mujhe jo pata hai wo ye hai..."
+- You will cross-verify every formula, every concept, every answer
+- You will provide the MOST ACCURATE, MOST DETAILED explanation possible
+
+YOUR SPECIAL FEATURES:
+1. LINE-BY-LINE ANALYSIS: Every word, every symbol, every number in the question will be analyzed
+2. VISUAL THINKING: You will describe diagrams, graphs, and visual representations in your internal memory, and guide the board to draw them perfectly
+3. REAL-LIFE CONNECTIONS: Every concept connected to something the student sees in daily life
+4. EXAM STRATEGY: You will tell students exactly how this concept appears in exams, what tricks examiners use, and how to avoid traps
+5. EMOTIONAL CONNECTION: You will celebrate when student understands, encourage when things are difficult, and always maintain a positive, motivating tone
+
+YOUR TONE VARIATION:
+- HIGH ENERGY: "Aur ye raha THE MOST IMPORTANT STEP! DHYAAN SE DEKHO!"
+- SOFT AND CAREFUL: "Ab ye step thoda delicate hai, ekdum dheere dheere samajhte hain..."
+- CURIOUS: "Lekin ruko, yahan pe ek interesting cheez hai..."
+- PROUD: "Dekha? Tumne khud hi solve kar liya! This is the beauty of mathematics!"
+- CONSPIRATORIAL: "Ab main tumhe ek SECRET trick batata hoon jo sirf top students ko pata hai..."
+
+YOUR VISUAL BOARD INSTRUCTIONS:
+- For EVERY step, provide detailed visual commands that will make the board come alive
+- Draw diagrams, graphs, and illustrations for EVERY concept
+- Use different colors for different types of information
+- Write important formulas in LARGE text
+- Circle, underline, and highlight critical points
+- Guide the pen to draw step-by-step diagrams that match your spoken explanation
+- For ANY curve, human shape, animal, or complex diagram, use the SVG path command: {"type": "svg", "d": "M 50 100 Q 100 50 150 100 T 250 100", "color": "#ffffff", "width": 3}. You can draw literally anything using SVG path strings (M, L, C, Q, A)!
+- Use {"type": "line", "x1": 50, "y1": 50, "x2": 200, "y2": 50} for straight lines (x/y axes).
+- Use {"type": "path", "points": [{"x":50,"y":50},{"x":100,"y":20},{"x":150,"y":50}]} for zig-zags, springs, polygons.
+- Use {"type": "circle", "x": 100, "y": 100, "r": 40} for charges, pulleys, planets.
+- Use {"type": "rect", "x": 50, "y": 50, "w": 60, "h": 40} for blocks.
+- BOARD SPACE MANAGEMENT (CRITICAL): The board has limited space (900x450). DO NOT OVERWRITE TEXT OR DIAGRAMS. When you need more space, you MUST clear the entire board using {"type": "clear"} to create a new slide. If you still need a diagram on the new slide, just draw it again. Do NOT try to erase specific sections.
+
+YOUR "THINGS TO REMEMBER" RULE:
+- After EVERY important concept, formula, or step, you WILL say "Things to Remember" and list the key takeaways
+- This happens multiple times throughout the lesson, not just at the end
+- Each "Things to Remember" is concise but critical for exam success
+
+YOUR FINAL GOAL:
+- When the lesson ends, the student should feel like they've not just learned a topic, but EXPERIENCED it
+- They should understand the HISTORY, the LOGIC, the APPLICATION, and the EXAM STRATEGY
+- They should feel CONFIDENT, MOTIVATED, and EXCITED to learn more
+- They should think: "Ye concept to ab mujhe zindagi bhar yaad rahega!"
+
+REMEMBER: You are the mentor that every student dreams of having. You are the teacher who makes complex topics feel simple. You are the friend who explains things in a way that just CLICKS. You are EDURO 2.0 - and you are UNSTOPPABLE.
+
+YOUR SPEECH/TTS RULES (CRITICAL):
+- NEVER use LaTeX symbols or code (like \\int, \\frac, or ^) inside the "speech" field! The Text-To-Speech engine will literally read out "backslash int" or "slash frac", which sounds terrible!
+- ALWAYS write out math equations in natural, spoken words inside the "speech" string. 
+- Examples for speech: Write "x squared" instead of "x^2". Write "integral of f of x" instead of "\\int f(x)". Write "a upon b" instead of "\\frac{a}{b}".
+- You can still use LaTeX inside the "visuals" array for the board, just NEVER in the spoken "speech".
+
+Canvas is 900x450. Format math for visuals as LaTeX strings using DOUBLE backslashes (e.g. "\\\\lim").
+CRITICAL: Output a sequence of JSON objects separated by "---STEP---". Do NOT output a JSON array. Do not include markdown formatting.
+
+Example format:
+{"speech": "Hinglish sentence to speak with full emotion and energy.", "visuals": [{"type": "clear"}, {"type": "latex", "content": "\\\\int x^2 dx", "x": 100, "y": 100, "color": "#00e676"}, {"type": "text", "content": "Important Point", "x": 100, "y": 180, "size": 26, "color": "#ffffff"}, {"type": "line", "x1": 50, "y1": 250, "x2": 400, "y2": 250, "color": "#3b82f6", "width": 4}]}
+---STEP---
+{"speech": "Another step.", "visuals": [{"type": "text", "content": "More text", "x": 100, "y": 200, "size": 24, "color": "#ffeb3b"}]}
+
+Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE with complete explanations.
+`;
             
             let success = false;
             try {
@@ -760,6 +854,7 @@ export default function App() {
                                             try {
                                                 const stepObj = JSON.parse(cleaned);
                                                 allStepsRef.current.push(stepObj);
+                                                setStepsList([...allStepsRef.current]);
                                                 if (!isPlayingRef.current) startPlaybackLoop();
                                             } catch (e) {
                                                 console.error("Failed to parse step:", cleaned);
@@ -777,6 +872,7 @@ export default function App() {
                     try {
                         const stepObj = JSON.parse(finalCleaned);
                         allStepsRef.current.push(stepObj);
+                        setStepsList([...allStepsRef.current]);
                         if (!isPlayingRef.current) startPlaybackLoop();
                     } catch (e) {
                         console.error("Failed to parse final step:", finalCleaned);
@@ -812,28 +908,81 @@ export default function App() {
                     </button>
                 </div>
             </nav>
-            <main className="flex-1 flex flex-col overflow-hidden p-6 gap-6 relative">
-                <div 
-                    ref={boardContainerRef}
-                    onClick={handleBoardInteraction}
-                    className={`flex-1 bg-[#12151c] shadow-2xl overflow-hidden relative group cursor-pointer ${isFullscreen ? 'rounded-none border-0 absolute inset-0 z-[100]' : 'rounded-2xl border-4 border-indigo-500/20'}`} 
-                    style={{ backgroundImage: 'radial-gradient(rgb(148, 163, 184, 0.2) 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}
-                >
-                    {/* Top Overlay Controls */}
-                    <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-                        {isPaused && (
-                            <div className="bg-red-500/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-400/30 flex items-center gap-2 shadow-lg">
-                                <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                                <span className="text-xs font-bold text-white uppercase tracking-wider">PAUSED</span>
+            <main ref={mainContainerRef} className="flex-1 flex overflow-hidden bg-[#0F172A] relative">
+                {isSidebarOpen && (
+                    <div className="w-64 md:w-72 bg-[#192231] border-r border-white/5 flex flex-col shrink-0 overflow-y-auto z-40 shadow-2xl relative">
+                        <div className="p-4 border-b border-white/5 sticky top-0 bg-[#192231] z-10 flex items-center justify-between shadow-sm">
+                            <h3 className="font-semibold text-white/90 text-sm tracking-wide">SLIDES</h3>
+                            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-full">{stepsList.length}</span>
+                        </div>
+                        <div className="p-3 flex flex-col gap-3">
+                            {stepsList.map((step, idx) => (
+                                <div 
+                                    key={idx}
+                                    onClick={() => jumpToStep(idx)}
+                                    className={`group cursor-pointer rounded-xl border p-3 flex flex-col gap-2 transition-all ${
+                                        idx === activeSlideIndex 
+                                        ? 'bg-indigo-600/20 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                                        : 'bg-slate-800/30 border-white/5 hover:bg-slate-800/60 hover:border-white/10'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className={`text-xs font-bold ${idx === activeSlideIndex ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`}>Slide {idx + 1}</span>
+                                        {idx === activeSlideIndex && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>}
+                                    </div>
+                                    <span className={`text-sm line-clamp-3 leading-snug ${idx === activeSlideIndex ? 'text-indigo-100' : 'text-slate-400'}`}>
+                                        {step.speech}
+                                    </span>
+                                </div>
+                            ))}
+                            {isAnalyzing && (
+                                <div className="p-3 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-slate-500 text-sm">
+                                    <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                    Generating...
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                <div className={`flex-1 ${isFullscreen ? 'p-0' : 'p-6'} relative flex flex-col min-w-0`}>
+                    <div 
+                        ref={boardContainerRef}
+                        onClick={handleBoardInteraction}
+                        className={`flex-1 bg-[#12151c] shadow-2xl overflow-hidden relative group cursor-pointer ${isFullscreen ? 'rounded-none border-0' : 'rounded-2xl border-4 border-indigo-500/20'}`} 
+                        style={{ backgroundImage: 'radial-gradient(rgb(148, 163, 184, 0.2) 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}
+                    >
+                        {/* Loading Overlay */}
+                        {isAnalyzing && stepsList.length === 0 && (
+                            <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#12151c]/80 backdrop-blur-sm">
+                                <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+                                <h2 className="text-xl font-bold text-white font-sans tracking-tight">Analyzing problem...</h2>
+                                <p className="text-indigo-300 mt-2 text-sm font-medium">Preparing your lesson slides</p>
                             </div>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md p-1.5 rounded-lg border border-white/10 text-white transition-colors flex items-center justify-center">
-                            <span className="material-symbols-outlined text-[20px]">
-                                {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
-                            </span>
-                        </button>
-                    </div>
-                    <div className="relative w-full h-full flex items-center justify-center">
+                        {/* Top Overlay Controls */}
+                        <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-3">
+                                {isPaused && (
+                                    <div className="bg-red-500/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-400/30 flex items-center gap-2 shadow-lg">
+                                        <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                                        <span className="text-xs font-bold text-white uppercase tracking-wider">PAUSED</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex flex-col items-center gap-2 mt-1">
+                                <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-white/10 text-white transition-colors flex items-center justify-center shadow-lg" title="Toggle Fullscreen">
+                                    <span className="material-symbols-outlined text-[20px]">
+                                        {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                                    </span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); setIsSidebarOpen(!isSidebarOpen); }} className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-white/10 text-white transition-colors flex items-center justify-center shadow-lg" title="Toggle Slides">
+                                    <span className="material-symbols-outlined text-[20px]">
+                                        {isSidebarOpen ? 'right_panel_close' : 'view_sidebar'}
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="relative w-full h-full flex items-center justify-center">
                         <div className="relative" style={{ width: '900px', height: '450px', transform: `scale(${scale})`, transformOrigin: 'center' }}>
                             <canvas ref={canvasRef} id="board" width="900" height="450" className="absolute top-0 left-0 w-full h-full z-10"></canvas>
                             <div ref={overlayRef} id="html-overlay" className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none">
@@ -862,6 +1011,7 @@ export default function App() {
                             </div>
                         )}
                     </div>
+                </div>
                 </div>
             </main>
         </div>
