@@ -892,7 +892,8 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
 
     return (
         <div className="flex flex-col h-screen w-full bg-[#0F172A] text-white font-sans overflow-hidden">
-            <nav className="flex items-center justify-between px-6 py-4 bg-[#1E293B] border-b border-white/10 shrink-0">
+            {/* Desktop & Tablet Navigation (md and up) - Strictly preserved */}
+            <nav className="hidden md:flex items-center justify-between px-6 py-4 bg-[#1E293B] border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
                         <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
@@ -908,68 +909,173 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                     </button>
                 </div>
             </nav>
-            <main ref={mainContainerRef} className="flex-1 flex overflow-hidden bg-[#0F172A] relative">
-                {isSidebarOpen && (
-                    <div className="w-64 md:w-72 bg-[#192231] border-r border-white/5 flex flex-col shrink-0 overflow-y-auto z-40 shadow-2xl relative">
-                        <div className="p-4 border-b border-white/5 sticky top-0 bg-[#192231] z-10 flex items-center justify-between shadow-sm">
-                            <h3 className="font-semibold text-white/90 text-sm tracking-wide">SLIDES</h3>
-                            <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-full">{stepsList.length}</span>
+
+            {/* Mobile / Android Navigation & Action Toolbar (below md) */}
+            <div className="flex md:hidden flex-col bg-[#1E293B] border-b border-white/10 shrink-0 z-30">
+                {/* Mobile Top Header */}
+                <div className="flex items-center justify-between px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 bg-indigo-500 rounded-lg flex items-center justify-center shadow-md">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
                         </div>
-                        <div className="p-3 flex flex-col gap-3">
-                            {stepsList.map((step, idx) => (
-                                <div 
-                                    key={idx}
-                                    onClick={() => jumpToStep(idx)}
-                                    className={`group cursor-pointer rounded-xl border p-3 flex flex-col gap-2 transition-all ${
-                                        idx === activeSlideIndex 
-                                        ? 'bg-indigo-600/20 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
-                                        : 'bg-slate-800/30 border-white/5 hover:bg-slate-800/60 hover:border-white/10'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className={`text-xs font-bold ${idx === activeSlideIndex ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`}>Slide {idx + 1}</span>
-                                        {idx === activeSlideIndex && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>}
-                                    </div>
-                                    <span className={`text-sm line-clamp-3 leading-snug ${idx === activeSlideIndex ? 'text-indigo-100' : 'text-slate-400'}`}>
-                                        {step.speech}
-                                    </span>
-                                </div>
-                            ))}
-                            {isAnalyzing && (
-                                <div className="p-3 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-slate-500 text-sm">
-                                    <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                    Generating...
-                                </div>
-                            )}
-                        </div>
+                        <h1 className="text-base font-bold tracking-tight">AI Mentor <span className="text-indigo-400">Pro</span></h1>
                     </div>
+                    
+                    <div className="flex items-center gap-1.5">
+                        <button 
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-indigo-300 flex items-center gap-1 shadow-sm active:scale-95"
+                            title="View Slides"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">view_sidebar</span>
+                            <span>Slides ({stepsList.length})</span>
+                        </button>
+                        <button 
+                            onClick={toggleFullscreen} 
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 text-white flex items-center justify-center active:scale-95" 
+                            title="Fullscreen"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">
+                                {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Upload & Action Controls */}
+                <div className="px-3 pb-2.5 pt-0.5 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <label 
+                            htmlFor="mobileFileUpload" 
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-800/90 active:bg-slate-700 border border-indigo-500/30 rounded-xl text-xs font-semibold text-indigo-200 cursor-pointer truncate shadow-sm"
+                        >
+                            <span className="material-symbols-outlined text-[18px] text-indigo-400">
+                                {file ? 'task_alt' : 'add_photo_alternate'}
+                            </span>
+                            <span className="truncate max-w-[150px]">
+                                {file ? file.name : "Choose Question"}
+                            </span>
+                        </label>
+                        <input 
+                            type="file" 
+                            id="mobileFileUpload" 
+                            accept="image/*, application/pdf" 
+                            onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                            className="hidden" 
+                        />
+
+                        <button 
+                            onClick={processUpload} 
+                            disabled={isAnalyzing} 
+                            className="px-4 py-2 bg-indigo-600 active:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-bold transition-all shadow-lg text-xs shrink-0 flex items-center gap-1.5 active:scale-95"
+                        >
+                            {isAnalyzing ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Analyzing...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-[16px]">play_circle</span>
+                                    <span>Analyze & Start</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Mobile Status Bar */}
+                    <div className="flex items-center gap-1.5 px-1">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${status.includes('Error') ? 'bg-red-400' : isAnalyzing ? 'bg-amber-400 animate-ping' : 'bg-emerald-400'}`}></div>
+                        <span className={`text-[11px] font-medium truncate ${status.includes('Error') ? 'text-red-400' : 'text-slate-300'}`}>
+                            {status}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <main ref={mainContainerRef} className="flex-1 flex overflow-hidden bg-[#0F172A] relative">
+                {/* Slides Panel - Responsive for Mobile and Desktop */}
+                {isSidebarOpen && (
+                    <>
+                        {/* Mobile Backdrop */}
+                        <div 
+                            onClick={() => setIsSidebarOpen(false)} 
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                        />
+                        
+                        <div className="fixed md:relative inset-y-0 left-0 w-72 sm:w-80 md:w-72 bg-[#192231] border-r border-white/10 flex flex-col shrink-0 overflow-y-auto z-50 md:z-40 shadow-2xl">
+                            <div className="p-4 border-b border-white/10 sticky top-0 bg-[#192231] z-10 flex items-center justify-between shadow-sm">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold text-white/90 text-sm tracking-wide">LESSON SLIDES</h3>
+                                    <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">{stepsList.length}</span>
+                                </div>
+                                <button 
+                                    onClick={() => setIsSidebarOpen(false)} 
+                                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
+                                </button>
+                            </div>
+                            <div className="p-3 flex flex-col gap-3">
+                                {stepsList.map((step, idx) => (
+                                    <div 
+                                        key={idx}
+                                        onClick={() => {
+                                            jumpToStep(idx);
+                                            if (window.innerWidth < 768) setIsSidebarOpen(false);
+                                        }}
+                                        className={`group cursor-pointer rounded-xl border p-3 flex flex-col gap-2 transition-all ${
+                                            idx === activeSlideIndex 
+                                            ? 'bg-indigo-600/20 border-indigo-500/50 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                                            : 'bg-slate-800/30 border-white/5 hover:bg-slate-800/60 hover:border-white/10'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className={`text-xs font-bold ${idx === activeSlideIndex ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`}>Slide {idx + 1}</span>
+                                            {idx === activeSlideIndex && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>}
+                                        </div>
+                                        <span className={`text-sm line-clamp-3 leading-snug ${idx === activeSlideIndex ? 'text-indigo-100' : 'text-slate-400'}`}>
+                                            {step.speech}
+                                        </span>
+                                    </div>
+                                ))}
+                                {isAnalyzing && (
+                                    <div className="p-3 rounded-xl border border-dashed border-white/10 flex items-center justify-center text-slate-500 text-sm">
+                                        <div className="w-4 h-4 border-2 border-slate-500 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                        Generating...
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </>
                 )}
-                <div className={`flex-1 ${isFullscreen ? 'p-0' : 'p-6'} relative flex flex-col min-w-0`}>
+
+                <div className={`flex-1 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4 md:p-6'} relative flex flex-col min-w-0 h-full overflow-hidden`}>
                     <div 
                         ref={boardContainerRef}
                         onClick={handleBoardInteraction}
-                        className={`flex-1 bg-[#12151c] shadow-2xl overflow-hidden relative group cursor-pointer ${isFullscreen ? 'rounded-none border-0' : 'rounded-2xl border-4 border-indigo-500/20'}`} 
+                        className={`flex-1 bg-[#12151c] shadow-2xl overflow-hidden relative group cursor-pointer ${isFullscreen ? 'rounded-none border-0' : 'rounded-xl md:rounded-2xl border-2 md:border-4 border-indigo-500/20'}`} 
                         style={{ backgroundImage: 'radial-gradient(rgb(148, 163, 184, 0.2) 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}
                     >
                         {/* Loading Overlay */}
                         {isAnalyzing && stepsList.length === 0 && (
-                            <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#12151c]/80 backdrop-blur-sm">
-                                <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-                                <h2 className="text-xl font-bold text-white font-sans tracking-tight">Analyzing problem...</h2>
-                                <p className="text-indigo-300 mt-2 text-sm font-medium">Preparing your lesson slides</p>
+                            <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-[#12151c]/80 backdrop-blur-sm p-4 text-center">
+                                <div className="w-10 h-10 md:w-12 md:h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
+                                <h2 className="text-lg md:text-xl font-bold text-white font-sans tracking-tight">Analyzing problem...</h2>
+                                <p className="text-indigo-300 mt-2 text-xs md:text-sm font-medium">Preparing your lesson slides</p>
                             </div>
                         )}
                         {/* Top Overlay Controls */}
-                        <div className="absolute top-4 right-4 z-50 flex flex-col items-end gap-2">
+                        <div className="absolute top-2.5 right-2.5 md:top-4 md:right-4 z-50 flex flex-col items-end gap-2">
                             <div className="flex items-center gap-3">
                                 {isPaused && (
-                                    <div className="bg-red-500/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-red-400/30 flex items-center gap-2 shadow-lg">
-                                        <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                                        <span className="text-xs font-bold text-white uppercase tracking-wider">PAUSED</span>
+                                    <div className="bg-red-500/90 backdrop-blur-md px-2.5 py-1 md:px-3 md:py-1.5 rounded-lg border border-red-400/30 flex items-center gap-2 shadow-lg">
+                                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-white animate-pulse"></div>
+                                        <span className="text-[10px] md:text-xs font-bold text-white uppercase tracking-wider">PAUSED</span>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex flex-col items-center gap-2 mt-1">
+                            <div className="hidden md:flex flex-col items-center gap-2 mt-1">
                                 <button onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }} className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-white/10 text-white transition-colors flex items-center justify-center shadow-lg" title="Toggle Fullscreen">
                                     <span className="material-symbols-outlined text-[20px]">
                                         {isFullscreen ? 'fullscreen_exit' : 'fullscreen'}
@@ -995,6 +1101,7 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                                 </div>
                             </div>
                         </div>
+                        </div>
                         {/* Interactive Hint Zones */}
                         <div className="absolute inset-y-0 left-0 w-[30%] opacity-0 group-hover:opacity-10 transition-opacity bg-gradient-to-r from-white to-transparent pointer-events-none flex items-center pl-8">
                             <span className="material-symbols-outlined text-6xl text-white">keyboard_double_arrow_left</span>
@@ -1002,16 +1109,52 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                         <div className="absolute inset-y-0 right-0 w-[30%] opacity-0 group-hover:opacity-10 transition-opacity bg-gradient-to-l from-white to-transparent pointer-events-none flex items-center justify-end pr-8">
                             <span className="material-symbols-outlined text-6xl text-white">keyboard_double_arrow_right</span>
                         </div>
-                        {/* Line-by-line Subtitles Overlay */}
+                        {/* Subtitles Overlay */}
                         {subtitles && (
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-4xl z-40 pointer-events-none flex justify-center">
-                                <div className="bg-slate-900/90 backdrop-blur-xl border border-indigo-500/30 text-white px-6 py-2 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.8)] text-center transition-all duration-300 transform scale-100 opacity-100 max-w-full">
-                                    <span className="text-lg md:text-xl font-medium tracking-wide text-indigo-100 whitespace-nowrap overflow-hidden text-ellipsis block">{subtitles}</span>
+                            <div className="absolute bottom-3 md:bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-4xl z-40 pointer-events-none flex justify-center">
+                                <div className="bg-slate-900/95 backdrop-blur-xl border border-indigo-500/30 text-white px-4 py-1.5 md:px-6 md:py-2 rounded-xl md:rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.8)] text-center transition-all duration-300 transform scale-100 opacity-100 max-w-full">
+                                    <span className="text-xs sm:text-base md:text-xl font-medium tracking-wide text-indigo-100 line-clamp-2 md:whitespace-nowrap md:overflow-hidden md:text-ellipsis block">{subtitles}</span>
                                 </div>
                             </div>
                         )}
                     </div>
-                </div>
+
+                    {/* Mobile Slide Control Bar (bottom toolbar for phone/Android) */}
+                    <div className="flex md:hidden items-center justify-between px-2 pt-2 gap-2 shrink-0">
+                        <button
+                            onClick={() => skip(-1)}
+                            disabled={activeSlideIndex <= 0}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-30 disabled:pointer-events-none border border-white/10 text-xs font-semibold text-white active:scale-95"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                            <span>Prev</span>
+                        </button>
+                        
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={togglePause}
+                                className="w-8 h-8 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-md active:scale-95"
+                            >
+                                <span className="material-symbols-outlined text-[18px]">
+                                    {isPaused ? 'play_arrow' : 'pause'}
+                                </span>
+                            </button>
+                            {stepsList.length > 0 && (
+                                <span className="text-[11px] font-bold text-slate-300">
+                                    Slide {activeSlideIndex + 1}/{stepsList.length}
+                                </span>
+                            )}
+                        </div>
+
+                        <button
+                            onClick={() => skip(1)}
+                            disabled={activeSlideIndex >= stepsList.length - 1}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 disabled:opacity-30 disabled:pointer-events-none border border-white/10 text-xs font-semibold text-white active:scale-95"
+                        >
+                            <span>Next</span>
+                            <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                        </button>
+                    </div>
                 </div>
             </main>
         </div>
