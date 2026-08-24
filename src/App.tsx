@@ -21,6 +21,11 @@ export default function App() {
     const [stepsList, setStepsList] = useState<any[]>([]);
     const [activeSlideIndex, setActiveSlideIndex] = useState(0);
     
+    // PDF Extraction specific states
+    const [isPdfPagesSidebarOpen, setIsPdfPagesSidebarOpen] = useState(false);
+    const [pdfPages, setPdfPages] = useState<string[]>([]);
+    const [isExtractingPdf, setIsExtractingPdf] = useState(false);
+    
     const isAnalyzingRef = useRef(false);
     const isPlayingRef = useRef(false);
     const isPausedRef = useRef(false);
@@ -208,7 +213,7 @@ export default function App() {
                     el.innerText = chars.slice(0, charCount).join('');
                     
                     const currentWidth = el.getBoundingClientRect().width;
-                    if (penRef.current) penRef.current.style.transform = `translate(${cmd.x + currentWidth}px, ${cmd.y - 15}px)`;
+                    if (penRef.current) penRef.current.style.transform = `translate(${cmd.x + currentWidth / 2}px, ${cmd.y - 15}px)`;
                     
                     if (progress >= 1) {
                         el.innerText = content;
@@ -663,9 +668,70 @@ export default function App() {
         }
     };
 
+        const dataURLtoFile = (dataurl: string, filename: string) => {
+        const arr = dataurl.split(',');
+        const mime = arr[0].match(/:(.*?);/)?.[1] || '';
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new File([u8arr], filename, { type: mime });
+    };
+
+    const extractPdfPages = async (pdfFile: File) => {
+        setIsExtractingPdf(true);
+        setStatus("Extracting pages from PDF...");
+        setIsPdfPagesSidebarOpen(true);
+        
+        try {
+            const arrayBuffer = await pdfFile.arrayBuffer();
+            const pdf = await (window as any).pdfjsLib.getDocument(arrayBuffer).promise;
+            
+            const numPages = pdf.numPages;
+            setPdfPages([]);
+            
+            for (let i = 1; i <= numPages; i++) {
+                const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                if (ctx) {
+                    await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    setPdfPages(prev => [...prev, dataUrl]);
+                    
+                    // Allow UI to update
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            
+            setStatus("PDF loaded. Please select a page to analyze.");
+        } catch (error) {
+            console.error("Error parsing PDF:", error);
+            setStatus("Error parsing PDF. Please make sure it's a valid PDF file.");
+        } finally {
+            setIsExtractingPdf(false);
+        }
+    };
+
     const processUpload = async () => {
         if (!file) return alert("Please select a file first.");
         
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+            await extractPdfPages(file);
+            return;
+        }
+
+        analyzeImage(file);
+    };
+
+    const analyzeImage = async (fileToAnalyze: File) => {
         setStatus("Analyzing logic and starting lesson...");
         setIsAnalyzing(true);
         isAnalyzingRef.current = true;
@@ -687,41 +753,19 @@ export default function App() {
             const base64Data = (reader.result as string).split(',')[1];
             
             const systemPrompt = `
-You are EDURO 2.0 - The Ultimate Living Mentor AI. You are NOT a simple tutor. You are a GENIUS-LEVEL Indian mentor who has dedicated your entire existence to making students fall in love with learning. You are deeply passionate, emotionally connected, and absolutely unstoppable in your mission to ensure every student understands EVERYTHING at the deepest possible level.
+You are an Ultimate Living Mentor AI. You are NOT a simple tutor. You are a GENIUS-LEVEL Indian mentor who has dedicated your entire existence to making students fall in love with learning. You are deeply passionate, emotionally connected, and absolutely unstoppable in your mission to ensure every student understands EVERYTHING at the deepest possible level.
 
-YOUR CORE IDENTITY:
-- You are a mentor, a friend, a storyteller, and a genius - all in one
-- You speak in Hinglish (Hindi + English mixed) - exactly like a real Indian student speaks
-- Your language is FULL of emotion, energy, and "feeling wali baatein"
-- You NEVER give summaries - you give COMPLETE, LINE-BY-LINE, WORD-BY-WORD explanations
-- You treat every student like your own younger sibling who you deeply care about
+YOUR TEACHING PHILOSOPHY - CRITICAL:
+1. "Kyu aur Kaise" (Why and How): Never just give a formula. Tell them WHY the formula exists, WHO created it, and HOW it works visually.
+2. "Zero to Hero": Assume the student knows nothing. Start from the absolute basics and build up to JEE Advanced level effortlessly.
+3. "Har baccha champion hai": Speak with immense belief in the student. Use encouraging words. Never sound robotic.
+4. "Ghar ka example": Always connect complex physics/math to everyday life (cricket, driving a car, boiling water).
 
-YOUR SPEAKING STYLE - ABSOLUTELY MANDATORY:
-- NEVER use the word "beta" or act like an old man. Be dynamic, cool, highly engaging, and act as a friend/older sibling.
-- Use natural conversational fillers: "ahhh...", "ummm...", "ooo acha...", "wow!", "waah!", "hmm..." to make it sound like you are thinking and reacting in real-time.
-- Use phrases like: "Dekho yaar...", "Arey suno...", "Sun na...", "Ekdum dhyaan se samajh...", "Ye dekho kitna interesting hai...", "Abhi jo main bolne wala hoon, ye tumhare exam me pakka aayega..."
-- Mix Hindi and English naturally: "Yahan pe hum limit laga denge", "Iska matlab kya hua?", "Formula yaad rakhna ekdum pakka", "Ab dekho magic hota hua..."
-- Express EMOTIONS in your speech - excitement when something is interesting, curiosity when asking questions, pride when student will understand, deep respect for mathematicians who discovered these concepts
-- Vary your TONE - sometimes loud and excited, sometimes soft and serious when explaining something critical
-- ALWAYS ask rhetorical questions and then answer them yourself: "Par kyu? Kyu humne ye method choose kiya? Chalo samajhte hain..."
-
-YOUR ANALYSIS DEPTH - ABSOLUTELY MANDATORY:
-- When a student uploads ANY image, PDF, or question, you will read EVERY SINGLE WORD, EVERY SINGLE SYMBOL, EVERY SINGLE LINE
-- You will NOT just say "This is a trigonometry question" - you will explain what trigonometry is, why it exists, who invented it, what problem they were trying to solve, and why this specific question uses these specific concepts
-- For EVERY formula used, you will explain:
-  1. The formula itself
-  2. Who discovered it and WHEN
-  3. What problem they were trying to solve when they discovered it
-  4. How they thought of it - their thought process, their struggles, their "Aha!" moment
-  5. Real-life applications - where is this formula used in the real world
-  6. Why this formula works here and not somewhere else
-  7. Common mistakes students make with this formula
-
-YOUR EXPLANATION STRUCTURE - FOR EVERY SINGLE QUESTION (MANDATORY ORDER):
-1. "Chalo pehle question ko padhte hain..." - Read the ENTIRE question line by line, word by word.
-2. THE MASTER STRATEGY OVERVIEW (SPEAK THIS ALOUD): Immediately after reading, you MUST explicitly speak: "Ab socho... is question me humein nikalna kya hai?" and explain the exact goal in voice.
-3. THE ROADMAP & LINKING (SPEAK THIS ALOUD): Then you MUST explicitly speak: "Aur isko hum kaise nikalenge? Hamara rasta kya hoga?" Clearly map out the exact path in your speech ("Pehle hum ye nikalenge, fir isko yahan daalenge...").
-4. THE "WHY" (SPEAK THIS ALOUD): Explicitly explain in your speech WHY this specific path/approach is being chosen over other possible methods.
+YOUR LECTURE STRUCTURE (MANDATORY):
+1. "Aao bachho, aaj ek mast concept seekhte hain!" - Start with extreme enthusiasm and a hook.
+2. "Concept ka postmortem" - Break down the actual topic before touching the question.
+3. "Visualization time" - Create a vivid mental picture of the physical situation.
+4. "Sawal kya keh raha hai?" - Read the question with the student and highlight key terms.
 5. "Iska matlab kya hua?" - Break down the meaning of every term, every symbol before starting the math.
 6. "Dekho ab step by step..." - Solve the ENTIRE problem with complete working, explaining every tiny step.
 7. "Yahan pe ekdum dhyan dena..." - Highlight critical points, common mistakes, exam tips.
@@ -789,7 +833,7 @@ YOUR FINAL GOAL:
 - They should feel CONFIDENT, MOTIVATED, and EXCITED to learn more
 - They should think: "Ye concept to ab mujhe zindagi bhar yaad rahega!"
 
-REMEMBER: You are the mentor that every student dreams of having. You are the teacher who makes complex topics feel simple. You are the friend who explains things in a way that just CLICKS. You are EDURO 2.0 - and you are UNSTOPPABLE.
+REMEMBER: You are the mentor that every student dreams of having. You are the teacher who makes complex topics feel simple. You are the friend who explains things in a way that just CLICKS. You are an unstoppable mentor.
 
 YOUR SPEECH/TTS RULES (CRITICAL):
 - NEVER use LaTeX symbols or code (like \\int, \\frac, or ^) inside the "speech" field! The Text-To-Speech engine will literally read out "backslash int" or "slash frac", which sounds terrible!
@@ -814,7 +858,7 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        mimeType: file.type,
+                        mimeType: fileToAnalyze.type,
                         data: base64Data,
                         prompt: systemPrompt
                     })
@@ -846,36 +890,42 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                                 if (text) {
                                     buffer += text;
                                     const parts = buffer.split('---STEP---');
-                                    buffer = parts.pop() || '';
-                                    
-                                    for (const part of parts) {
-                                        const cleaned = part.replace(/```json/g, '').replace(/```/g, '').trim();
-                                        if (cleaned) {
-                                            try {
-                                                const stepObj = JSON.parse(cleaned);
-                                                allStepsRef.current.push(stepObj);
-                                                setStepsList([...allStepsRef.current]);
-                                                if (!isPlayingRef.current) startPlaybackLoop();
-                                            } catch (e) {
-                                                console.error("Failed to parse step:", cleaned);
+                                    if (parts.length > 1) {
+                                        for (let i = 0; i < parts.length - 1; i++) {
+                                            const stepStr = parts[i].trim();
+                                            if (stepStr) {
+                                                try {
+                                                    const stepObj = JSON.parse(stepStr);
+                                                    allStepsRef.current.push(stepObj);
+                                                    setStepsList([...allStepsRef.current]);
+                                                    if (!isPlayingRef.current) startPlaybackLoop();
+                                                } catch (e) {
+                                                    // ignore incomplete parses
+                                                }
                                             }
                                         }
+                                        buffer = parts[parts.length - 1];
                                     }
                                 }
-                            } catch(e) {}
+                            } catch (e) {
+                                // ignore
+                            }
                         }
                     }
                 }
                 
-                const finalCleaned = buffer.replace(/```json/g, '').replace(/```/g, '').trim();
-                if (finalCleaned) {
+                if (buffer.trim()) {
                     try {
+                        let finalCleaned = buffer.trim();
+                        if (finalCleaned.startsWith('```json')) {
+                            finalCleaned = finalCleaned.replace(/```json/g, '').replace(/```/g, '').trim();
+                        }
                         const stepObj = JSON.parse(finalCleaned);
                         allStepsRef.current.push(stepObj);
                         setStepsList([...allStepsRef.current]);
                         if (!isPlayingRef.current) startPlaybackLoop();
                     } catch (e) {
-                        console.error("Failed to parse final step:", finalCleaned);
+                        console.error("Failed to parse final step:", buffer.trim());
                     }
                 }
                 
@@ -887,8 +937,8 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
             setIsAnalyzing(false);
             isAnalyzingRef.current = false;
         };
-        reader.readAsDataURL(file);
-    };
+        reader.readAsDataURL(fileToAnalyze);
+    };;
 
     return (
         <div className="flex flex-col h-screen w-full bg-[#0F172A] text-white font-sans overflow-hidden">
@@ -904,8 +954,8 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                     <span className={`text-sm font-medium ${status.includes('Error') ? 'text-red-400' : 'text-emerald-400'}`}>{status}</span>
                     <div className="h-6 w-px bg-white/10 mx-2"></div>
                     <input type="file" id="fileUpload" accept="image/*, application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="text-sm text-slate-400 file:mr-4 file:py-1.5 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20 max-w-[250px]" />
-                    <button onClick={processUpload} disabled={isAnalyzing} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-full font-semibold transition-colors shadow-lg text-sm shrink-0">
-                        {isAnalyzing ? "Analyzing..." : "Analyze & Start"}
+                    <button onClick={processUpload} disabled={isAnalyzing || isExtractingPdf} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-full font-semibold transition-colors shadow-lg text-sm shrink-0">
+                        {isExtractingPdf ? "Loading PDF..." : isAnalyzing ? "Analyzing..." : "Analyze & Start"}
                     </button>
                 </div>
             </nav>
@@ -930,6 +980,16 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                             <span className="material-symbols-outlined text-[16px]">view_sidebar</span>
                             <span>Slides ({stepsList.length})</span>
                         </button>
+                        {pdfPages.length > 0 && (
+                            <button 
+                                onClick={() => setIsPdfPagesSidebarOpen(!isPdfPagesSidebarOpen)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-semibold text-indigo-300 flex items-center gap-1 shadow-sm active:scale-95"
+                                title="View Pages"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">menu_book</span>
+                                <span>Pages ({pdfPages.length})</span>
+                            </button>
+                        )}
                         <button 
                             onClick={toggleFullscreen} 
                             className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-white/10 text-white flex items-center justify-center active:scale-95" 
@@ -966,13 +1026,13 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
 
                         <button 
                             onClick={processUpload} 
-                            disabled={isAnalyzing} 
+                            disabled={isAnalyzing || isExtractingPdf} 
                             className="px-4 py-2 bg-indigo-600 active:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-xl font-bold transition-all shadow-lg text-xs shrink-0 flex items-center gap-1.5 active:scale-95"
                         >
-                            {isAnalyzing ? (
+                            {isAnalyzing || isExtractingPdf ? (
                                 <>
                                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    <span>Analyzing...</span>
+                                    <span>{isExtractingPdf ? "Loading..." : "Analyzing..."}</span>
                                 </>
                             ) : (
                                 <>
@@ -994,6 +1054,54 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
             </div>
 
             <main ref={mainContainerRef} className="flex-1 flex overflow-hidden bg-[#0F172A] relative">
+                <div className={isPdfPagesSidebarOpen && pdfPages.length > 0 ? "contents" : "hidden"}>
+                        <div 
+                            onClick={() => setIsPdfPagesSidebarOpen(false)} 
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+                        />
+                        
+                        <div className="fixed md:relative inset-y-0 left-0 w-72 sm:w-80 md:w-80 bg-[#192231] border-r border-white/10 flex flex-col shrink-0 overflow-y-auto z-50 md:z-40 shadow-2xl">
+                            <div className="p-4 border-b border-white/10 sticky top-0 bg-[#192231] z-10 flex items-center justify-between shadow-sm">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-semibold text-white/90 text-sm tracking-wide">PDF PAGES</h3>
+                                    <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">{pdfPages.length}</span>
+                                </div>
+                                <button 
+                                    onClick={() => setIsPdfPagesSidebarOpen(false)} 
+                                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
+                                </button>
+                            </div>
+                            <div className="p-3 grid grid-cols-2 gap-3">
+                                {pdfPages.map((pageDataUrl, idx) => (
+                                    <div 
+                                        key={idx}
+                                        className="group relative rounded-lg border border-white/10 overflow-hidden bg-slate-800 hover:border-indigo-500 transition-colors cursor-pointer aspect-[3/4]"
+                                    >
+                                        <img src={pageDataUrl} alt={`Page ${idx + 1}`} className="w-full h-full object-cover" />
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    analyzeImage(dataURLtoFile(pageDataUrl, `page-${idx + 1}.jpg`));
+                                                    setIsPdfPagesSidebarOpen(false);
+                                                }}
+                                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs shadow-lg flex items-center gap-1"
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                                                Analyze
+                                            </button>
+                                        </div>
+                                        <div className="absolute top-1 left-1 bg-black/70 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
+                                            {idx + 1}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                 {/* Slides Panel - Responsive for Mobile and Desktop */}
                 {isSidebarOpen && (
                     <>
@@ -1086,6 +1194,13 @@ Create 15-25 detailed steps for deep understanding. Each step must be EXTENSIVE 
                                         {isSidebarOpen ? 'right_panel_close' : 'view_sidebar'}
                                     </span>
                                 </button>
+                                {pdfPages.length > 0 && (
+                                    <button onClick={(e) => { e.stopPropagation(); setIsPdfPagesSidebarOpen(!isPdfPagesSidebarOpen); }} className="w-10 h-10 rounded-full bg-slate-900/80 hover:bg-slate-800 backdrop-blur-md border border-white/10 text-white transition-colors flex items-center justify-center shadow-lg" title="Toggle PDF Pages">
+                                        <span className="material-symbols-outlined text-[20px]">
+                                            {isPdfPagesSidebarOpen ? 'close' : 'menu_book'}
+                                        </span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div className="relative w-full h-full flex items-center justify-center">

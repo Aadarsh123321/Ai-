@@ -7,6 +7,7 @@ html, body, #root {
 }
 
 .written-text {
+    transform: translateY(-50%);
     position: absolute;
     font-family: 'Kalam', cursive;
     text-shadow: 0 0 8px rgba(255,255,255,0.3);
@@ -14,6 +15,7 @@ html, body, #root {
 }
 
 .latex-wipe {
+    transform: translateY(-50%);
     position: absolute;
     clip-path: inset(0 100% 0 0);
 }
